@@ -27,7 +27,7 @@ test = evaluate testexpr $ mkValues [20,1,1]
 
 testOptExpr = (2*x + 3*y + 5*z)^2 + 1/x * (- y^2) 
     where [x,y,z] = mkVars 3
-testOpt = gradientDescent (1e-10) 0.001 testOptExpr vals
+testOpt = gradientDescent (1e-10) 0.01 testOptExpr vals
     where vals = mkValues [10,10,10]
 
 

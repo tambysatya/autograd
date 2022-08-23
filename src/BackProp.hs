@@ -101,8 +101,9 @@ backprop expr = do
                             delParent expr e
                             backprop e
 
-computeGrad :: Expr -> Values -> BPState (Double, Values)
-computeGrad expr vals = do
+computeGrad :: Expr -> BPState (Double, Values)
+computeGrad expr = do
+    vals <- use values
     ret <- forward expr 
     adjoints . at expr .= Just 1
     forM (M.keys vals) backprop
@@ -110,35 +111,12 @@ computeGrad expr vals = do
     pure (ret, M.fromList $ zip (M.keys vals) grads)
 
 evaluate :: Expr -> Values -> (Double, Values)
-evaluate expr vals = fst $ runState (computeGrad expr vals) $ BP M.empty vals M.empty M.empty
-{-
-evaluate :: Expr -> Values -> (Double, Values)
-evaluate expr vals = (ret,grads)
-    where (ret, forwardpass) = runStateT (forward expr ) $ BP M.empty vals M.empty  M.empty
-        -- Tous les gradients sont à 0 excepté pour celui de l'expression
-          (_,backwardpass) = runStateT (forM (M.keys vals) backprop) $ forwardpass & adjoints . at expr .~ Just 1
-          grads = fromJust <$> M.fromList [(xi, xi `M.lookup` _adjoints backwardpass) | xi <- M.keys vals]
-          setGradM = adjoints . at expr .~ Just 1
-
-evaluateIO :: Expr -> Values -> IO (Double, Values)
-evaluateIO expr vals = do
-    (ret, forwardpass) <- runStateT (forward expr) $ BP M.empty vals M.empty  M.empty
-    putStrLn $ "evaluate has returned: " ++ show ret
-
-    -- Tous les gradients sont à 0 excepté pour celui de l'expression
-    (_,backwardpass) <- runStateT (forM (M.keys vals) backprop) $ forwardpass & adjoints . at expr .~ Just 1
-    putStrLn $ "computing graph of : f(x)=" ++ show expr
-    dumpGraph (_graph forwardpass)
-    let grads = fromJust <$> M.fromList [(xi, xi `M.lookup` _adjoints backwardpass) | xi <- M.keys vals]
-    forM (M.keys vals) $ \xi -> putStrLn $ "grad_" ++ show xi ++ "=" ++ show (fromJust $ xi `M.lookup` _adjoints backwardpass)
-    --putStrLn $ unlines $ show <$> M.assocs ( _adjoints grad)
-
-    pure (ret,grads)
+evaluate expr vals = fst $ runState (computeGrad expr) $ BP M.empty vals M.empty M.empty
 
 
 
+{- Utils -}
 dumpGraph :: ReverseGraph -> IO ()
 dumpGraph gr = forM_ (M.assocs gr) (putStrLn . dumpEntry)
     where   dumpEntry :: (Expr, [Expr]) -> String
             dumpEntry (k,e) = show k ++ " appears in:\n " ++ unlines ( ('\t':) . show <$> e)
-            -}
