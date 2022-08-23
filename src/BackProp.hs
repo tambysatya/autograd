@@ -23,7 +23,7 @@ data BP = BP {_graph :: ReverseGraph, _values :: Values, _adjoints :: Adjoints, 
 
 makeLenses ''BP
 
-type BPState a = StateT BP IO a
+type BPState a = State BP a
 
 addParent :: Expr -> Expr -> BPState ()
 addParent parent child = do
@@ -34,16 +34,18 @@ addParent parent child = do
 
 delParent :: Expr -> Expr -> BPState ()
 delParent parent child = graph . at child . _Just %= L.delete parent
+addAdjoint :: Expr -> Double -> BPState ()
+addAdjoint expr val = adjoints . at expr . _Just %= (+val)
+
+
     
 
 forward :: Expr -> BPState Double
 forward expr = do
     valueM <- use $ values . at expr
-    liftIO $ putStrLn $ "\t[evaluate] " ++ show expr 
     adjoints . at expr .= Just 0
     ret <- case valueM of
-            Just val -> do liftIO $ putStrLn $ "\t[evaluate] found " ++ show expr ++ "=" ++ show val
-                           pure val
+            Just val -> pure val
             Nothing -> do
                 graph . at expr .= Just []
                 case expr of
@@ -66,9 +68,6 @@ forward expr = do
 
 
 
-addAdjoint :: Expr -> Double -> BPState ()
-addAdjoint expr val = adjoints . at expr . _Just %= (+val)
-
 
 
 backprop :: Expr -> BPState ()
@@ -81,32 +80,48 @@ backprop expr = do
             parentsM <- use $ graph . at expr
             case parentsM of
                 Nothing -> error $ show expr ++ " is not in the graph"
-                Just (x:xs) -> do
-                    liftIO $ putStrLn $ "\t[backprop] trying " ++ show expr ++ " [backtrack] -> " ++ show x
-                    backprop x
+                Just (x:xs) -> backprop x
                 Just [] -> do 
-                    (Just adj) <- use $ adjoints . at expr
-                    liftIO $ putStrLn $ "\t[backprop] " ++ show expr ++ " has derivative " ++ show adj
+                    adj <- fromJust <$> (use $ adjoints . at expr)
                     gradients . at expr .= Just adj
                     case expr of
                         Var v -> pure ()
                         Op op -> do
                             let (e,e') = operands op
-                            (Just x, Just y) <- (,) <$> use (values . at e) <*> use (values . at e')
+                            (x,y) <- (over both fromJust) <$> ((,)  <$> use (values . at e) <*> use (values . at e'))
                             let (adje,adje') = diffOp op x y adj
                             addAdjoint e adje >> addAdjoint e' adje'
                             delParent expr e >> delParent expr e'
                             backprop e >> backprop e'
                         Fun f -> do
                             let e = variable f
-                            (Just x) <- use $ values . at e
+                            x <- fromJust <$> (use $ values . at e)
                             let adje = diffFun f x adj
                             addAdjoint e adje
                             delParent expr e
                             backprop e
 
-evaluate :: Expr -> Values -> IO (Double, Values)
-evaluate expr vals = do
+computeGrad :: Expr -> Values -> BPState (Double, Values)
+computeGrad expr vals = do
+    ret <- forward expr 
+    adjoints . at expr .= Just 1
+    forM (M.keys vals) backprop
+    grads <- forM (M.keys vals) $ \vi -> fromJust <$> use (adjoints . at vi)
+    pure (ret, M.fromList $ zip (M.keys vals) grads)
+
+evaluate :: Expr -> Values -> (Double, Values)
+evaluate expr vals = fst $ runState (computeGrad expr vals) $ BP M.empty vals M.empty M.empty
+{-
+evaluate :: Expr -> Values -> (Double, Values)
+evaluate expr vals = (ret,grads)
+    where (ret, forwardpass) = runStateT (forward expr ) $ BP M.empty vals M.empty  M.empty
+        -- Tous les gradients sont à 0 excepté pour celui de l'expression
+          (_,backwardpass) = runStateT (forM (M.keys vals) backprop) $ forwardpass & adjoints . at expr .~ Just 1
+          grads = fromJust <$> M.fromList [(xi, xi `M.lookup` _adjoints backwardpass) | xi <- M.keys vals]
+          setGradM = adjoints . at expr .~ Just 1
+
+evaluateIO :: Expr -> Values -> IO (Double, Values)
+evaluateIO expr vals = do
     (ret, forwardpass) <- runStateT (forward expr) $ BP M.empty vals M.empty  M.empty
     putStrLn $ "evaluate has returned: " ++ show ret
 
@@ -120,7 +135,10 @@ evaluate expr vals = do
 
     pure (ret,grads)
 
+
+
 dumpGraph :: ReverseGraph -> IO ()
 dumpGraph gr = forM_ (M.assocs gr) (putStrLn . dumpEntry)
     where   dumpEntry :: (Expr, [Expr]) -> String
             dumpEntry (k,e) = show k ++ " appears in:\n " ++ unlines ( ('\t':) . show <$> e)
+            -}
