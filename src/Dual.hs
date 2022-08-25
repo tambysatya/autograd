@@ -7,7 +7,7 @@ import Control.Lens
 {-| 
 We consider numbers in the form x=a + bε.
 ε is a constant such that ε² = 0
-Similarily to complex numbers, usual operations are availables.
+Similarily to complex numbers, usual operations are available.
 At the end of calculus, we have f(x) = f(a) +f'(a)ε.
 Using the taylor serie of f, this result can be proven easily. Indeed:
 
@@ -15,7 +15,7 @@ f(x)=f(a+ε)= f(a)+εf'(a) + o(ε²)
 
 Since ε²= 0, we have the result.
  
-In this code, we implement this algebra il haskell.
+In this code, we implement this algebra in haskell.
 
 -}    
 
@@ -84,8 +84,9 @@ autodiff f x  = grad $ f (x :+: 1)
     where grad (_ :+: g) = g
 
 {-| Computes the gradient of f
-  - We set all the other variables to constants (by setting their imaginary part to 0)
-  - We set x to be a variable (by setting its imaginary part to 1)
+    For each component x:
+      - We set all the other variables to constants (by setting their imaginary part to 0)
+      - We set x to be a variable (by setting its imaginary part to 1)
 
 -}
 autograd :: (A.Array Int DualNum -> DualNum) -> A.Array Int Double -> A.Array Int Double
@@ -94,7 +95,7 @@ autograd f x = A.listArray (1,n) $ fmap _dual [f $ xdual & ix i . dual .~ 1 | i 
           xdual = fromRational . toRational <$> x 
 
 {-| Computes the jacobian of f
-Since the function outputs a vector, we need performs as previously,
+Since the function outputs a vector, we operate as previously,
 but at each iteration, we collect the derivatives relative to each output
 -}
 autojacobian :: (A.Array Int DualNum -> A.Array Int DualNum) -> A.Array Int Double -> A.Array (Int,Int) Double
@@ -117,3 +118,6 @@ testFun vars = mkArray [exp (2*x + 3*y) - 2*z
     where [x,y,z] = A.elems vars
 
 test = autojacobian testFun $ mkArray [2,1,5]
+testAugmented vars = (x + 2*y + z)^2 + x*l1 + y*l2 + z*l3
+    where [x,y,z,l1,l2,l3] = A.elems vars
+-- autograd testAugmented $ mkArray [10,5,2,0,0,0]

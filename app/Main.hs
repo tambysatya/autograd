@@ -27,8 +27,32 @@ test = evaluate testexpr $ mkValues [20,1,1]
 
 testOptExpr = (2*x + 3*y + 5*z)^2 + 1/x * (- y^2) 
     where [x,y,z] = mkVars 3
-testOpt = gradientDescent (1e-10) 0.01 testOptExpr vals
+testOpt = gradientDescent (1e-5) 0.01 testOptExpr vals
     where vals = mkValues [10,10,10]
+
+ctrs :: [Constraint]
+ctrs = [--2*x + y + z :=: 5,
+        --x + z :=: 10,
+        --2*x + z :=: 1
+        -- x :>: 0,
+        -- y :>: 0,
+        -- z :>: 0]
+        x :=: 0,
+        y :=: 0,
+        z :=: 0 ]
+    where [x,y,z] = mkVars 3
+
+ctrs2 = [x :>: 0, y :>: 0, z :>: 0]
+    where [x,y,z] = mkVars 3
+ctrs3 = [0 :>: x, 0 :>: y, 0 :>: z]
+    where [x,y,z] = mkVars 3
+ctrs4 = [x + 2*y + z :=: 5]
+    
+[x,y,z] = mkVars 3
+testConvexExpr = (x + 2*y + z)^2
+    where [x,y,z] = mkVars 3
+testAugmentedExpr = (x + 2*y + z)^2 + x*l1 
+    where [x,y,z,l1,l2,l3] = mkVars 6
 
 
 main :: IO ()

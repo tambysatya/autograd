@@ -102,3 +102,4 @@ variable (Exp x) = x
 variable (Log x) = x
 variable (Sin x) = x
 variable (Cos x) = x
+

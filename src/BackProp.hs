@@ -66,7 +66,27 @@ forward expr = do
     pure ret
 
 
-
+forwardNoGrad :: Expr -> BPState Double
+forwardNoGrad expr = do
+    valueM <- use $ values . at expr
+    ret <- case valueM of
+            Just val -> pure val
+            Nothing -> do
+                graph . at expr .= Just []
+                case expr of
+                    Constant x -> pure x
+                    Var idx -> error $ "Variable " ++ show idx ++ " has no value"
+                    Op op -> do 
+                        let (e,e') = operands op
+                        (x,y) <- (,) <$> forwardNoGrad e <*> forwardNoGrad e'
+                        pure $ evalOp op x y
+                    Fun f -> do 
+                        let e = variable f
+                        x <- forwardNoGrad e
+                        pure $ evalFun f x
+                    
+    values . at expr .= Just ret
+    pure ret
 
 
 
@@ -112,6 +132,7 @@ computeGrad expr = do
 
 evaluate :: Expr -> Values -> (Double, Values)
 evaluate expr vals = fst $ runState (computeGrad expr) $ BP M.empty vals M.empty M.empty
+evaluateNoGrad expr vals = fst $ runState (forwardNoGrad expr) $ BP M.empty vals M.empty M.empty
 
 
 
