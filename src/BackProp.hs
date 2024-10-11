@@ -7,6 +7,7 @@ import qualified Data.Map as M
 import qualified Data.Array as A
 import qualified Data.List as L
 
+import Control.Monad
 import Control.Monad.State
 import Control.Lens
 import Data.Maybe
